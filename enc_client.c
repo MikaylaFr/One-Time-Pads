@@ -13,6 +13,63 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+char NAME[12] = "enc_client\n";
+char SERV_NAME[12] = "enc_server\n";
+
+//Send message to server
+void send_message(int connection_socket, char *message){
+    char buffer[256];
+    int charsRead = 0;
+    char *saveptr = &message[0];
+    int messageLen = strlen(message);
+
+    //Determine how many times to call send
+    int loop = messageLen / 255;
+    int extra = strlen(message) % 255;
+
+    if(loop > 0){
+        for(int i=0; i < loop; i++){
+            memset(buffer, '\0', 256);
+            memcpy(buffer, saveptr, 255);
+            charsRead = send(connection_socket, buffer, 255, 0);
+            if (charsRead < 0){
+                fprintf(stderr, "SERVER ERROR writing to socket\n");
+            }
+            //Move save ptr
+            saveptr += 256;
+        }
+    }
+    if(extra > 0){
+        memset(buffer, '\0', 256);
+        memcpy(buffer, saveptr, extra);
+        charsRead = send(connection_socket, buffer, 255, 0);
+        if (charsRead < 0){
+          fprintf(stderr, "SERVER ERROR writing to socket\n");
+        }
+    }
+    return;
+}
+
+//Receive message from server
+void recv_message(int connection_socket, char *message){
+    char buffer[256];
+    const char term_char = '\n';
+    int charsRead = 0;
+    while(1){
+        memset(buffer, '\0', 256);
+        charsRead = recv(connection_socket, buffer, 255, 0);
+        if (charsRead < 0){
+            fprintf(stderr, "ERROR reading from socket\n");
+            exit(1);
+        }
+        strcat(message, buffer);
+        //Search for terminating character
+        printf("searching for char\n");
+        if(strchr(buffer, term_char) != NULL) break;
+    }
+    return;
+}
+
 // Set up the address struct
 void setupAddressStruct(struct sockaddr_in* address, 
                           int portNumber, 
@@ -40,10 +97,11 @@ void setupAddressStruct(struct sockaddr_in* address,
 
 void server_encryption(char **enc_strs, char *port){
     int listening_port = atoi(port);
-    int socketFD, portNumber, charsWritten, charsRead;
+    int socketFD;
     struct sockaddr_in serverAddress;
     char hostName[10] = "localhost";
-    char buffer[256] = "blah blah blah\n";
+    char buffer[256];
+    memset(buffer, '\0', 256);
 
     //create socket
     socketFD = socket(AF_INET, SOCK_STREAM, 0);
@@ -56,27 +114,30 @@ void server_encryption(char **enc_strs, char *port){
 
     // Connect to server
     if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
-        fprintf(stderr, "CLIENT: ERROR connecting\n");
+        fprintf(stderr, "CLIENT: ERROR connecting on port %d\n", listening_port);
         exit(1);
     }
 
-    charsWritten = send(socketFD, buffer, strlen(buffer), 0); 
-    if (charsWritten < 0){
-      fprintf(stderr,"CLIENT: ERROR writing to socket\n");
+    //Verify connection to enc_server
+    char message[70500];
+    memset(message, '\0', 70500);
+    strcpy(message, NAME);
+    send_message(socketFD, message);
+    memset(message, '\0', 70500);
+    //Verify connection
+    recv_message(socketFD, message);
+    if(strcmp(message, SERV_NAME) != 0){
+        fprintf(stderr, "CLIENT: Not acceptable server, terminating");
+        close(socketFD);
+        exit(2);
     }
-    if (charsWritten < strlen(buffer)){
-      fprintf(stderr,"CLIENT: WARNING: Not all data written to socket!\n");
+    //if not enc_serv, reject connection
+    if(strcmp(message, SERV_NAME) != 0){
+        fprintf(stderr, "CLIENT: Not designated server, rejecting connection\n");
+        exit(2);
     }
-
-
-    //Get return message from server
-    //Clear out buffer for reuse
-    memset(buffer, '\0', sizeof(buffer));
-    charsRead = recv(socketFD, buffer, sizeof(buffer) - 1, 0); 
-    if (charsRead < 0){
-      fprintf(stderr, "CLIENT: ERROR reading from socket\n");
-    }
-    printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
+    printf("CLIENT accepted connection");
+    
 
     // Close the socket
     close(socketFD); 
@@ -88,15 +149,12 @@ Check for bad chars
 */
 int check_chars(char *str_to_check, int length){
     int curr_char = -1;
-    //printf("String: %s\nLength: %d\n", str_to_check, length);
     for(int i=0; i < length-1; i++){
         curr_char = str_to_check[i];
-        //printf("Curr char: %d   %c\n", curr_char, curr_char);
         //check if within ascii range
         if(curr_char < 65 || curr_char > 90){
             //If not space,  or newline, stderr and exit
             if(curr_char != 32 && curr_char != 10){
-                //printf("Bad: %c %d", curr_char, curr_char);
                 return 1;
             }
         }
