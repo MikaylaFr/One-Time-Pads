@@ -1,6 +1,6 @@
 /*
-    File: enc_client.c
-    Checks for errors before sending to server encryption. 
+    File: dec_client.c
+    Checks for errors before sending to server decryption. 
     Resources: https://www.tutorialspoint.com/cprogramming/c_command_line_arguments.htm
                 client example
 */
@@ -13,8 +13,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-char NAME[12] = "enc_client\n";
-char SERV_NAME[12] = "enc_server\n";
+char NAME[12] = "dec_client\n";
+char SERV_NAME[12] = "dec_server\n";
 
 //Send message to server
 void send_message(int connection_socket, char *message){
@@ -94,7 +94,7 @@ void setupAddressStruct(struct sockaddr_in* address,
           hostInfo->h_length);
 }
 
-void server_encryption(char **enc_strs, char *port){
+void server_decryption(char **dec_strs, char *port){
     int listening_port = atoi(port);
     int socketFD;
     struct sockaddr_in serverAddress;
@@ -117,7 +117,7 @@ void server_encryption(char **enc_strs, char *port){
         exit(1);
     }
 
-    //Verify connection to enc_server
+    //Verify connection to dec_server
     char message[70500];
     memset(message, '\0', 70500);
     strcpy(message, NAME);
@@ -125,21 +125,20 @@ void server_encryption(char **enc_strs, char *port){
     memset(message, '\0', 70500);
     //Verify connection
     recv_message(socketFD, message);
-    //if not enc_serv, reject connection
     if(strcmp(message, SERV_NAME) != 0){
+        fprintf(stderr, "CLIENT: Not acceptable server, terminating");
         close(socketFD);
-        fprintf(stderr, "CLIENT: Not designated server, rejecting connection\n");
         exit(2);
     }
 
-    //Send plaintext
+    //Send ciphertext
     memset(message, '\0', 70500);
-    strcpy(message, enc_strs[0]);
+    strcpy(message, dec_strs[0]);
     send_message(socketFD, message);
     
     //Send key
     memset(message, '\0', 70500);
-    strcpy(message, enc_strs[1]);
+    strcpy(message, dec_strs[1]);
     send_message(socketFD, message);
 
     //Receive cipher text
@@ -174,35 +173,35 @@ int check_chars(char *str_to_check, int length){
 Read from file and save to array
 Checks for bad chars and if key file length
 */
-char **process_files(char *file1, char *file2, char **enc_files){
+char **process_files(char *file1, char *file2, char **dec_files){
     //Attempt open file
-    FILE *plaintext_file = fopen(file1, "r");
-    if(plaintext_file == NULL){
-        fprintf(stderr, "Could not open plaintext file.\n");
+    FILE *ciphertext_file = fopen(file1, "r");
+    if(ciphertext_file == NULL){
+        fprintf(stderr, "Could not open ciphertext file.\n");
         exit(3);
     };
     
-    //Read and getline from plaintext file
+    //Read and getline from ciphertext file
     char *read_file = NULL;
     size_t length = 0; //Length of file
     size_t len = 0;
     //Read from plain text
-    length = getline(&read_file, &len, plaintext_file);
+    length = getline(&read_file, &len, ciphertext_file);
     //Check for bad chars
     if(check_chars(read_file, length) > 0){
-        fprintf(stderr, "Bad character in plaintext file\n");
-        fclose(plaintext_file);
+        fprintf(stderr, "Bad character in ciphertext file\n");
+        fclose(ciphertext_file);
         free(read_file);
         exit (1);
     }
     //Copy over
-    enc_files[0] = calloc(len, sizeof(char));
-    strcpy(enc_files[0], read_file);
-    fclose(plaintext_file);
+    dec_files[0] = calloc(len, sizeof(char));
+    strcpy(dec_files[0], read_file);
+    fclose(ciphertext_file);
 
     //Read and getline from key file
     FILE *key_file = fopen(file2, "r");
-    if(plaintext_file == NULL){
+    if(ciphertext_file == NULL){
         fprintf(stderr, "Could not open key file.\n");
         exit(3);
     };
@@ -215,32 +214,32 @@ char **process_files(char *file1, char *file2, char **enc_files){
         exit (1);
     }
     fclose(key_file);
-    enc_files[1] = calloc(len, sizeof(char));
-    strcpy(enc_files[1], read_file);
+    dec_files[1] = calloc(len, sizeof(char));
+    strcpy(dec_files[1], read_file);
 
     //check for sizes
-    if(strlen(enc_files[0]) > strlen(enc_files[1])){
+    if(strlen(dec_files[0]) > strlen(dec_files[1])){
         free(read_file);
-        fprintf(stderr, "Not enough characters in key to encrypt\n");
+        fprintf(stderr, "Not enough characters in key to decrypt\n");
         exit(1);
     }
 
     free(read_file);
-    return enc_files;
+    return dec_files;
 }
 
 /*
-enc_client plaintext key port
-enc_strs[0] plaintext string
-enc_strs[1] key string
+dec_client ciphertext key port
+dec_strs[0] ciphertext string
+dec_strs[1] key string
 */
 int main(int argc, char *argv[]){
-    char *enc_files[2];
-    char **enc_strs = process_files(argv[1], argv[2], enc_files);
+    char *dec_files[2];
+    char **dec_strs = process_files(argv[1], argv[2], dec_files);
 
-    server_encryption(enc_strs, argv[3]);
+    server_decryption(dec_strs, argv[3]);
 
-    free(enc_files[0]);
-    free(enc_files[1]);
+    free(dec_files[0]);
+    free(dec_files[1]);
     return 0;
 }

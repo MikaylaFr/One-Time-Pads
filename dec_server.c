@@ -1,6 +1,6 @@
 /*
-    File: enc_server.c
-    Gets plaintext from socket connection, encrypts plain text, send back to client
+    File: dec_server.c
+    Gets ciphertext from socket connection, decrypts text, send back to client
     Resources: Example server program
 */
 #include <stdio.h>
@@ -13,13 +13,13 @@
 #include <fcntl.h>
 #include <math.h>
 
-char NAME[12] = "enc_server\n";
-char CLIENT_NAME[12] = "enc_client\n";
+char NAME[12] = "dec_server\n";
+char CLIENT_NAME[12] = "dec_client\n";
 
-//Encryption function
-char *encrypt(char *plaintext, char *key){
-    for(int i=0; plaintext[i] != '\n'; i++){
-        int currChar = plaintext[i];
+//Decryption function
+char *decrypt(char *ciphertext, char *key){
+    for(int i=0; ciphertext[i] != '\n'; i++){
+        int currChar = ciphertext[i];
         int keyChar = key[i];
         //Convert to number
         currChar = currChar - 65;
@@ -28,19 +28,19 @@ char *encrypt(char *plaintext, char *key){
         if(currChar < 0) currChar = 26;
         if(keyChar < 0) keyChar = 26;
 
-        //Encrypt
-        int cipherChar = currChar + keyChar;
-        cipherChar = cipherChar % 27;
+        //Decrypt
+        int plainChar = currChar - keyChar;
+        plainChar = plainChar % 27;
 
         //Convert back to char
         //Check for space
-        if(cipherChar == 26) cipherChar = 32;
-        else cipherChar += 65;
+        if(plainChar == 26) plainChar = 32;
+        else plainChar += 65;
 
-        //Copy over to plaintext
-        plaintext[i] = (char)cipherChar;
+        //Copy over to ciphertext
+        ciphertext[i] = (char)plainChar;
     }
-    return plaintext;
+    return ciphertext;
 }
 
 //Send message to client
@@ -115,13 +115,13 @@ void child_process(int connection_socket){
         exit(2);
     }
 
-    //Receive plaintext
+    //Receive ciphertext
     memset(message, '\0', 70500);
     recv_message(connection_socket, message);
     //Copy to new variable
-    char *plaintext = calloc(strlen(message)+1, sizeof(char));
-    memset(plaintext, '\0', strlen(message)+1);
-    strcpy(plaintext, message);
+    char *ciphertext = calloc(strlen(message)+1, sizeof(char));
+    memset(ciphertext, '\0', strlen(message)+1);
+    strcpy(ciphertext, message);
 
     //Receive key
     memset(message, '\0', 70500);
@@ -132,21 +132,21 @@ void child_process(int connection_socket){
     strcpy(keytext, message);
 
     //Check for bad input
-    if(strlen(plaintext) > strlen(keytext)){
+    if(strlen(ciphertext) > strlen(keytext)){
         fprintf(stderr, "SERVER: Bad input, message is larger than key");
-        free(plaintext);
+        free(ciphertext);
         free(keytext);
         exit(2);
     }
 
-    char *ciphertext = encrypt(plaintext, keytext);
+    char *plaintext = decrypt(ciphertext, keytext);
 
-    //Send back ciphertext
+    //Send back plaintext
     memset(message, '\0', 70500);
-    strcpy(message, ciphertext);
+    strcpy(message, plaintext);
     send_message(connection_socket, message);
 
-    free(plaintext);
+    free(ciphertext);
     free(keytext);
     exit(0);
 }
