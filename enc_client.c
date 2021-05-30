@@ -64,7 +64,6 @@ void recv_message(int connection_socket, char *message){
         }
         strcat(message, buffer);
         //Search for terminating character
-        printf("searching for char\n");
         if(strchr(buffer, term_char) != NULL) break;
     }
     return;
@@ -136,8 +135,21 @@ void server_encryption(char **enc_strs, char *port){
         fprintf(stderr, "CLIENT: Not designated server, rejecting connection\n");
         exit(2);
     }
-    printf("CLIENT accepted connection");
+
+    //Send plaintext
+    memset(message, '\0', 70500);
+    strcpy(message, enc_strs[0]);
+    send_message(socketFD, message);
     
+    //Send key
+    memset(message, '\0', 70500);
+    strcpy(message, enc_strs[1]);
+    send_message(socketFD, message);
+
+    //Receive cipher text
+    memset(message, '\0', 70500);
+    recv_message(socketFD, message);
+    printf("%s", message);
 
     // Close the socket
     close(socketFD); 
@@ -159,7 +171,6 @@ int check_chars(char *str_to_check, int length){
             }
         }
     }
-    //if more than 1 newline
     return 0;
 }
 
@@ -224,14 +235,14 @@ char **process_files(char *file1, char *file2, char **enc_files){
 
 /*
 enc_client plaintext key port
+enc_strs[0] plaintext string
+enc_strs[1] key string
 */
 int main(int argc, char *argv[]){
     char *enc_files[2];
     char **enc_strs = process_files(argv[1], argv[2], enc_files);
 
     server_encryption(enc_strs, argv[3]);
-
-    //printf("%s", ciphertext);
 
     free(enc_files[0]);
     free(enc_files[1]);

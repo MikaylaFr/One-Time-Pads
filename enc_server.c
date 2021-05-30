@@ -16,6 +16,33 @@
 char NAME[12] = "enc_server\n";
 char CLIENT_NAME[12] = "enc_client\n";
 
+//Encryption function
+char *encrypt(char *plaintext, char *key){
+    for(int i=0; plaintext[i] != '\n'; i++){
+        int currChar = plaintext[i];
+        int keyChar = key[i];
+        //Convert to number
+        currChar = currChar - 65;
+        keyChar = keyChar - 65;
+        //Check for space
+        if(currChar < 0) currChar = 26;
+        if(keyChar < 0) keyChar = 26;
+
+        //Encrypt
+        int cipherChar = currChar + keyChar;
+        cipherChar = cipherChar % 27;
+
+        //Convert back to char
+        //Check for space
+        if(cipherChar == 26) cipherChar = 32;
+        else cipherChar += 65;
+
+        //Copy over to plaintext
+        plaintext[i] = (char)cipherChar;
+    }
+    return plaintext;
+}
+
 //Send message to client
 void send_message(int connection_socket, char *message){
     char buffer[256];
@@ -64,7 +91,6 @@ void recv_message(int connection_socket, char *message){
         }
         strcat(message, buffer);
         //Search for terminating character
-        printf("searching for char\n");
         if(strchr(buffer, term_char) != NULL) break;
     }
     return;
@@ -81,12 +107,44 @@ void child_process(int connection_socket){
         close(connection_socket);
         exit(2);
     }
-    printf("SERVER: Accepted connection\n");
     //Send identity to client
     memset(message, '\0', 70500);
     strcpy(message, NAME);
     send_message(connection_socket, message);
 
+    //Receive plaintext
+    memset(message, '\0', 70500);
+    recv_message(connection_socket, message);
+    //Copy to new variable
+    char *plaintext = calloc(strlen(message)+1, sizeof(char));
+    memset(plaintext, '\0', strlen(message)+1);
+    strcpy(plaintext, message);
+
+    //Receive key
+    memset(message, '\0', 70500);
+    recv_message(connection_socket, message);
+    //Copy to new variable
+    char *keytext = calloc(strlen(message)+1, sizeof(char));
+    memset(keytext, '\0', strlen(message)+1);
+    strcpy(keytext, message);
+
+    //Check for bad input
+    if(strlen(plaintext) > strlen(keytext)){
+        fprintf(stderr, "SERVER: Bad input, message is larger than key");
+        free(plaintext);
+        free(keytext);
+        exit(2);
+    }
+
+    char *ciphertext = encrypt(plaintext, keytext);
+
+    //Send back ciphertext
+    memset(message, '\0', 70500);
+    strcpy(message, ciphertext);
+    send_message(connection_socket, message);
+
+    free(plaintext);
+    free(keytext);
     exit(0);
 }
 
@@ -136,9 +194,6 @@ int main(int argc, char *argv[]){
         if(connection_socket < 0){
             fprintf(stderr, "ERROR on accept\n");
         }
-        printf("SERVER: Connected to client running at host %d port %d\n", 
-                ntohs(client_addr.sin_addr.s_addr),
-                ntohs(client_addr.sin_port));
 
         //Create new process
         pid_t spawnPid = fork();
@@ -148,7 +203,6 @@ int main(int argc, char *argv[]){
                 exit(1);
                 break;
             case 0:
-                printf("Created process\n");
                 child_process(connection_socket);
                 //Some error occured
                 fprintf(stderr, "SERVER: Error with child process\n");
@@ -156,35 +210,6 @@ int main(int argc, char *argv[]){
             default:
                 break;
         }
-        
-/*
-        //Accept connection request and create connection socket
-        connection_socket = accept(listen_socket, (struct sockaddr *)&client_addr, &sizeof_clientInfo);
-        if(connection_socket < 0){
-            fprintf(stderr, "ERROR on accept\n");
-        }
-        printf("SERVER: Connected to client running at host %d port %d\n", 
-                ntohs(client_addr.sin_addr.s_addr),
-                ntohs(client_addr.sin_port));
-        
-        //Read from socket
-        charsRead = recv(connection_socket, buffer, 255, 0);
-        if (charsRead < 0){
-            fprintf(stderr, "ERROR reading from socket");
-        }
-        printf("SERVER: I received this from the client: \"%s\"\n", buffer);
-
-        charsRead = send(connection_socket, 
-                    "I am the server, and I got your message", 39, 0); 
-        if (charsRead < 0){
-          fprintf(stderr, "ERROR writing to socket");
-        }
-        // Close the connection socket for this client
-        close(connection_socket);
-*/
     }
-
-
-
     return 0;
 }
