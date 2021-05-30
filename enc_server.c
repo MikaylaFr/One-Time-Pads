@@ -16,17 +16,17 @@
 char NAME[12] = "enc_server\n";
 char CLIENT_NAME[12] = "enc_client\n";
 
-//Encryption function
+//Encryption function, 0 = ' '
 char *encrypt(char *plaintext, char *key){
     for(int i=0; plaintext[i] != '\n'; i++){
         int currChar = plaintext[i];
         int keyChar = key[i];
         //Convert to number
-        currChar = currChar - 65;
-        keyChar = keyChar - 65;
+        currChar = currChar - 64;
+        keyChar = keyChar - 64;
         //Check for space
-        if(currChar < 0) currChar = 26;
-        if(keyChar < 0) keyChar = 26;
+        if(currChar < 0) currChar = 0;
+        if(keyChar < 0) keyChar = 0;
 
         //Encrypt
         int cipherChar = currChar + keyChar;
@@ -34,8 +34,8 @@ char *encrypt(char *plaintext, char *key){
 
         //Convert back to char
         //Check for space
-        if(cipherChar == 26) cipherChar = 32;
-        else cipherChar += 65;
+        if(cipherChar == 0) cipherChar = 32;
+        else cipherChar += 64;
 
         //Copy over to plaintext
         plaintext[i] = (char)cipherChar;

@@ -22,20 +22,22 @@ char *decrypt(char *ciphertext, char *key){
         int currChar = ciphertext[i];
         int keyChar = key[i];
         //Convert to number
-        currChar = currChar - 65;
-        keyChar = keyChar - 65;
+        currChar = currChar - 64;
+        keyChar = keyChar - 64;
         //Check for space
-        if(currChar < 0) currChar = 26;
-        if(keyChar < 0) keyChar = 26;
+        if(currChar < 0) currChar = 0;
+        if(keyChar < 0) keyChar = 0;
 
         //Decrypt
         int plainChar = currChar - keyChar;
-        plainChar = plainChar % 27;
+        //Handle negatives
+        if(plainChar < 0) plainChar += 27;
+        else plainChar = plainChar % 27;
 
         //Convert back to char
         //Check for space
-        if(plainChar == 26) plainChar = 32;
-        else plainChar += 65;
+        if(plainChar == 0) plainChar = 32;
+        else plainChar += 64;
 
         //Copy over to ciphertext
         ciphertext[i] = (char)plainChar;
